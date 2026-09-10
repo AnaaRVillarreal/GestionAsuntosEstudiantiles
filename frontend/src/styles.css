@@ -1,0 +1,62 @@
+* { box-sizing: border-box; }
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f7f7f5;
+  margin: 0;
+  color: #222;
+}
+.contenedor {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+}
+nav.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+nav.tabs button {
+  padding: 10px 16px;
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+}
+nav.tabs button.activo {
+  background: #185FA5;
+  color: #fff;
+  border-color: #185FA5;
+}
+.tarjeta {
+  background: #fff;
+  border: 1px solid #e2e2e2;
+  border-radius: 10px;
+  padding: 20px;
+}
+.campo { margin-bottom: 14px; display: flex; flex-direction: column; gap: 4px; }
+.campo label { font-size: 13px; font-weight: 600; }
+.campo input, .campo select, .campo textarea {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.btn-principal {
+  background: #185FA5;
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn-aprobar { background: #3B6D11; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; margin-right: 6px; }
+.btn-rechazar { background: #993C1D; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; }
+.estado { padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.estado.enviado { background: #F1EFE8; color: #444; }
+.estado.en_revision { background: #FAEEDA; color: #854F0B; }
+.estado.aprobado { background: #EAF3DE; color: #27500A; }
+.estado.rechazado { background: #FAECE7; color: #712B13; }
+.error { color: #993C1D; font-size: 13px; margin-top: 8px; }
