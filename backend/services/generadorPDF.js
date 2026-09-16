@@ -44,6 +44,13 @@ function generarOficioPDF(solicitud, estudiante) {
     if (solicitud.fecha_evento) {
       doc.text(`Fecha: ${solicitud.fecha_evento}  Hora: ${solicitud.hora_inicio} - ${solicitud.hora_fin}`);
     }
+        if (solicitud.detalles && Object.keys(solicitud.detalles).length > 0) {
+      doc.moveDown(0.5);
+      doc.fontSize(11).text('Detalles adicionales:', { underline: true });
+      Object.entries(solicitud.detalles).forEach(([clave, valor]) => {
+        doc.fontSize(11).text(`${clave}: ${valor}`);
+      });
+    }
     doc.moveDown(3);
 
     doc.text('_____________________________', { align: 'left' });

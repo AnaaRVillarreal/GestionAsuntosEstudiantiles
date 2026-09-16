@@ -11,7 +11,8 @@ const TIPOS = [
 
 const INICIAL = {
   tipo: 'reserva_espacio', descripcion: '',
-  fecha_evento: '', hora_inicio: '', hora_fin: '', espacio_id: ''
+  fecha_evento: '', hora_inicio: '', hora_fin: '', espacio_id: '',
+  detalles: {}
 };
 
 export default function FormularioSolicitud() {
@@ -21,6 +22,10 @@ export default function FormularioSolicitud() {
   const [exito, setExito] = useState(null);
 
   const cambiar = (campo) => (e) => setDatos({ ...datos, [campo]: e.target.value });
+  const cambiarDetalle = (campo) => (e) =>
+    setDatos({ ...datos, detalles: { ...datos.detalles, [campo]: e.target.value } });
+
+  const cambiarTipo = (e) => setDatos({ ...INICIAL, tipo: e.target.value });
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -42,15 +47,13 @@ export default function FormularioSolicitud() {
     }
   };
 
-  const esReserva = datos.tipo === 'reserva_espacio';
-
   return (
     <div className="tarjeta">
       <h2>Nueva solicitud</h2>
       <form onSubmit={enviar}>
         <div className="campo">
           <label>Tipo de trámite</label>
-          <select value={datos.tipo} onChange={cambiar('tipo')}>
+          <select value={datos.tipo} onChange={cambiarTipo}>
             {TIPOS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
@@ -59,7 +62,8 @@ export default function FormularioSolicitud() {
           <textarea rows={3} value={datos.descripcion} onChange={cambiar('descripcion')} required />
         </div>
 
-        {esReserva && (
+        {/* IF reserva de espacio -> pide fecha, hora y espacio */}
+        {datos.tipo === 'reserva_espacio' && (
           <>
             <div className="campo">
               <label>Fecha</label>
@@ -76,6 +80,62 @@ export default function FormularioSolicitud() {
             <div className="campo">
               <label>ID del espacio/auditorio</label>
               <input type="number" value={datos.espacio_id} onChange={cambiar('espacio_id')} />
+            </div>
+          </>
+        )}
+
+        {/* ELSE IF transporte -> pide destino y número de pasajeros */}
+        {datos.tipo === 'transporte' && (
+          <>
+            <div className="campo">
+              <label>Destino</label>
+              <input value={datos.detalles.destino || ''} onChange={cambiarDetalle('destino')} />
+            </div>
+            <div className="campo">
+              <label>Número de pasajeros</label>
+              <input type="number" value={datos.detalles.num_pasajeros || ''} onChange={cambiarDetalle('num_pasajeros')} />
+            </div>
+          </>
+        )}
+
+        {/* ELSE IF evento -> pide nombre del evento y asistentes esperados */}
+        {datos.tipo === 'evento' && (
+          <>
+            <div className="campo">
+              <label>Nombre del evento</label>
+              <input value={datos.detalles.nombre_evento || ''} onChange={cambiarDetalle('nombre_evento')} />
+            </div>
+            <div className="campo">
+              <label>Asistentes esperados</label>
+              <input type="number" value={datos.detalles.asistentes_esperados || ''} onChange={cambiarDetalle('asistentes_esperados')} />
+            </div>
+          </>
+        )}
+
+        {/* ELSE IF constancia -> pide tipo de constancia e institución destino */}
+        {datos.tipo === 'constancia' && (
+          <>
+            <div className="campo">
+              <label>Tipo de constancia</label>
+              <input value={datos.detalles.tipo_constancia || ''} onChange={cambiarDetalle('tipo_constancia')} placeholder="Ej. de estudios, de buena conducta" />
+            </div>
+            <div className="campo">
+              <label>¿Para qué institución es?</label>
+              <input value={datos.detalles.institucion_destino || ''} onChange={cambiarDetalle('institucion_destino')} />
+            </div>
+          </>
+        )}
+
+        {/* ELSE (oficio_presentacion) -> pide a quién va dirigido y la institución */}
+        {datos.tipo === 'oficio_presentacion' && (
+          <>
+            <div className="campo">
+              <label>Dirigido a</label>
+              <input value={datos.detalles.dirigido_a || ''} onChange={cambiarDetalle('dirigido_a')} />
+            </div>
+            <div className="campo">
+              <label>Institución o empresa destino</label>
+              <input value={datos.detalles.institucion_destino || ''} onChange={cambiarDetalle('institucion_destino')} />
             </div>
           </>
         )}

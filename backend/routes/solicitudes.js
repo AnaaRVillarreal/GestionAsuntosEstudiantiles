@@ -55,12 +55,13 @@ router.post('/', requireRole('estudiante'), async (req, res) => {
     // ELSE: no requiere validar espacio, continúa directo
 
     // 3) Crear la solicitud, asociada al estudiante de la sesión
-    const solicitud = (await cliente.query(
+       const solicitud = (await cliente.query(
       `INSERT INTO solicitudes
-        (estudiante_id, tipo, descripcion, fecha_evento, hora_inicio, hora_fin, espacio_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        (estudiante_id, tipo, descripcion, fecha_evento, hora_inicio, hora_fin, espacio_id, detalles)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
       [estudiante.id, datos.tipo, datos.descripcion, datos.fecha_evento || null,
-       datos.hora_inicio || null, datos.hora_fin || null, datos.espacio_id || null]
+       datos.hora_inicio || null, datos.hora_fin || null, datos.espacio_id || null,
+       JSON.stringify(datos.detalles || {})]
     )).rows[0];
 
     await cliente.query('COMMIT');
