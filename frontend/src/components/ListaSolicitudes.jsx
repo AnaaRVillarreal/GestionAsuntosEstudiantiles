@@ -15,8 +15,14 @@ export default function ListaSolicitudes({ rol }) {
 
   useEffect(() => { cargar(); }, []);
 
-  const aprobar = async (id) => {
-    await apiFetch(`/api/solicitudes/${id}/aprobar`, { method: 'PUT' });
+   const aprobar = async (id) => {
+    const password = window.prompt('Confirma tu contraseña para aprobar esta solicitud:');
+    if (!password) return;
+    const { data } = await apiFetch(`/api/solicitudes/${id}/aprobar`, {
+      method: 'PUT',
+      body: JSON.stringify({ password })
+    });
+    if (!data.ok) return window.alert(data.errores?.[0] || 'No se pudo aprobar.');
     cargar();
   };
 

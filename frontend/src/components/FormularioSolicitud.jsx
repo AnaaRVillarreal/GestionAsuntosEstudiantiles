@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../api.js';
 
 const TIPOS = [
@@ -20,12 +20,30 @@ export default function FormularioSolicitud() {
   const [errores, setErrores] = useState([]);
   const [enviando, setEnviando] = useState(false);
   const [exito, setExito] = useState(null);
+  const [disponibilidad, setDisponibilidad] = useState(null);
 
   const cambiar = (campo) => (e) => setDatos({ ...datos, [campo]: e.target.value });
   const cambiarDetalle = (campo) => (e) =>
     setDatos({ ...datos, detalles: { ...datos.detalles, [campo]: e.target.value } });
 
   const cambiarTipo = (e) => setDatos({ ...INICIAL, tipo: e.target.value });
+
+  // SENSOR en vivo: consulta disponibilidad mientras el estudiante llena fecha/hora/espacio
+  useEffect(() => {
+    if (datos.tipo !== 'reserva_espacio') return setDisponibilidad(null);
+    if (!datos.espacio_id || !datos.fecha_evento || !datos.hora_inicio || !datos.hora_fin) return setDisponibilidad(null);
+
+    const temporizador = setTimeout(async () => {
+      const params = new URLSearchParams({
+        espacio_id: datos.espacio_id, fecha: datos.fecha_evento,
+        hora_inicio: datos.hora_inicio, hora_fin: datos.hora_fin
+      });
+      const { data } = await apiFetch(`/api/solicitudes/disponibilidad?${params}`);
+      setDisponibilidad(data.ok ? data.disponible : null);
+    }, 500);
+
+    return () => clearTimeout(temporizador);
+  }, [datos.tipo, datos.espacio_id, datos.fecha_evento, datos.hora_inicio, datos.hora_fin]);
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -61,7 +79,6 @@ export default function FormularioSolicitud() {
           <textarea rows={3} value={datos.descripcion} onChange={cambiar('descripcion')} required />
         </div>
 
-        {/* IF reserva de espacio -> pide fecha, hora y espacio */}
         {datos.tipo === 'reserva_espacio' && (
           <>
             <div className="campo">
@@ -80,10 +97,11 @@ export default function FormularioSolicitud() {
               <label>ID del espacio/auditorio</label>
               <input type="number" value={datos.espacio_id} onChange={cambiar('espacio_id')} />
             </div>
+            {disponibilidad === true && <p style={{ color: '#27500A', fontSize: 13 }}>✅ Este horario está disponible.</p>}
+            {disponibilidad === false && <p className="error">⚠️ Este horario ya está ocupado para ese espacio.</p>}
           </>
         )}
 
-        {/* ELSE IF transporte -> pide destino y número de pasajeros */}
         {datos.tipo === 'transporte' && (
           <>
             <div className="campo">
@@ -97,7 +115,6 @@ export default function FormularioSolicitud() {
           </>
         )}
 
-        {/* ELSE IF evento -> pide nombre del evento y asistentes esperados */}
         {datos.tipo === 'evento' && (
           <>
             <div className="campo">
@@ -111,7 +128,6 @@ export default function FormularioSolicitud() {
           </>
         )}
 
-        {/* ELSE IF constancia -> pide tipo de constancia e institución destino */}
         {datos.tipo === 'constancia' && (
           <>
             <div className="campo">
@@ -125,7 +141,6 @@ export default function FormularioSolicitud() {
           </>
         )}
 
-        {/* ELSE (oficio_presentacion) -> pide a quién va dirigido y la institución */}
         {datos.tipo === 'oficio_presentacion' && (
           <>
             <div className="campo">
