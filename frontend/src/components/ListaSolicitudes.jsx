@@ -73,7 +73,7 @@ export default function ListaSolicitudes({ rol }) {
                   </>
                 )}
                 {s.estado === 'aprobado' && (
-                  <button onClick={() => descargarOficio(s.id, s.folio)}>Descargar oficio</button>
+                  <button className="btn-rechazar" onClick={() => descargarOficio(s.id, s.folio)}>Descargar oficio</button>
                 )}
               </td>
             </tr>
