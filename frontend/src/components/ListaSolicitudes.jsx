@@ -49,7 +49,6 @@ export default function ListaSolicitudes({ rol }) {
 
   return (
     <div className="tarjeta">
-      <h2>{esResponsable ? 'Solicitudes' : 'Mis solicitudes'}</h2>
       <table>
         <thead>
           <tr>

@@ -49,7 +49,6 @@ export default function FormularioSolicitud() {
 
   return (
     <div className="tarjeta">
-      <h2>Nueva solicitud</h2>
       <form onSubmit={enviar}>
         <div className="campo">
           <label>Tipo de trámite</label>
