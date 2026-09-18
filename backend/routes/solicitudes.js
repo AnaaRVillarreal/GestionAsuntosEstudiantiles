@@ -14,11 +14,6 @@ const { bloquearFecha } = require('../services/bloqueadorFechas');
 
 router.use(requireAuth);
 
-// ------------------------------------------------------------
-// GET /api/solicitudes/disponibilidad
-// SENSOR en vivo: consulta si un espacio está libre ANTES de enviar
-// la solicitud completa, para avisar al estudiante mientras llena el formulario.
-// ------------------------------------------------------------
 router.get('/disponibilidad', async (req, res) => {
   const { espacio_id, fecha, hora_inicio, hora_fin } = req.query;
   if (!espacio_id || !fecha || !hora_inicio || !hora_fin) {
@@ -28,9 +23,6 @@ router.get('/disponibilidad', async (req, res) => {
   res.json({ ok: true, disponible });
 });
 
-// ------------------------------------------------------------
-// POST /api/solicitudes  -> el ESTUDIANTE crea una nueva solicitud
-// ------------------------------------------------------------
 router.post('/', requireRole('estudiante'), async (req, res) => {
   const datos = req.body;
 
@@ -89,13 +81,10 @@ router.post('/', requireRole('estudiante'), async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------
-// GET /api/solicitudes
-// ------------------------------------------------------------
 router.get('/', async (req, res) => {
   const { estado } = req.query;
   const params = [];
-    let sql = `SELECT s.*, e.nombre, e.matricula, e.correo, esp.nombre AS espacio_nombre
+  let sql = `SELECT s.*, e.nombre, e.matricula, e.correo, esp.nombre AS espacio_nombre
              FROM solicitudes s
              JOIN estudiantes e ON e.id = s.estudiante_id
              LEFT JOIN espacios esp ON esp.id = s.espacio_id`;
@@ -120,65 +109,83 @@ router.get('/', async (req, res) => {
 // PUT /api/solicitudes/:id/aprobar   (solo RESPONSABLE, requiere su contraseña)
 // ------------------------------------------------------------
 router.put('/:id/aprobar', requireRole('responsable'), async (req, res) => {
-  const { id } = req.params;
-  const { password } = req.body;
+  try {
+    const { id } = req.params;
+    const { password } = req.body;
 
-  // SENSOR extra: confirmación con la contraseña del responsable antes de aprobar
-  const { rows: filasUsuario } = await pool.query(
-    'SELECT password_hash FROM usuarios WHERE id = $1', [req.usuario.id]
-  );
-  const passwordValida = filasUsuario[0] && await bcrypt.compare(password || '', filasUsuario[0].password_hash);
-  if (!passwordValida) {
-    return res.status(401).json({ ok: false, errores: ['Contraseña incorrecta. No se aprobó la solicitud.'] });
+    const { rows: filasUsuario } = await pool.query(
+      'SELECT password_hash FROM usuarios WHERE id = $1', [req.usuario.id]
+    );
+    const passwordValida = filasUsuario[0] && await bcrypt.compare(password || '', filasUsuario[0].password_hash);
+    if (!passwordValida) {
+      return res.status(401).json({ ok: false, errores: ['Contraseña incorrecta. No se aprobó la solicitud.'] });
+    }
+
+    const { rows } = await pool.query(
+      `SELECT s.*, e.nombre, e.matricula, e.correo
+       FROM solicitudes s JOIN estudiantes e ON e.id = s.estudiante_id
+       WHERE s.id = $1`, [id]
+    );
+    const solicitud = rows[0];
+    if (!solicitud) return res.status(404).json({ ok: false, errores: ['Solicitud no encontrada.'] });
+
+    if (solicitud.estado !== 'en_revision') {
+      return res.status(409).json({ ok: false, errores: ['Esta solicitud ya fue procesada (no está en revisión).'] });
+    }
+
+    // IF es reserva de espacio -> vuelve a checar disponibilidad justo antes de aprobar,
+    // por si otra solicitud para el mismo horario se aprobó primero mientras tanto.
+    if (solicitud.tipo === 'reserva_espacio' && solicitud.espacio_id) {
+      const disponible = await verificarDisponibilidad(
+        solicitud.espacio_id, solicitud.fecha_evento, solicitud.hora_inicio, solicitud.hora_fin
+      );
+      if (!disponible) {
+        return res.status(409).json({
+          ok: false,
+          errores: ['Ese espacio y horario ya fueron tomados por otra solicitud aprobada. Esta solicitud debe rechazarse o reprogramarse.']
+        });
+      }
+      await bloquearFecha(solicitud.espacio_id, solicitud.id, solicitud.fecha_evento, solicitud.hora_inicio, solicitud.hora_fin);
+    }
+
+    const { folio, ruta, codigoVerificacion } = await generarOficioPDF(solicitud, solicitud);
+    await pool.query(
+      `UPDATE solicitudes SET folio = $2, oficio_pdf_ruta = $3, codigo_verificacion = $4 WHERE id = $1`,
+      [id, folio, ruta, codigoVerificacion]
+    );
+
+    const actualizada = await actualizarEstado(id, 'aprobado', { folio, rutaPDF: ruta });
+    await registrarAccion(id, 'solicitud_aprobada', `Folio: ${folio} (por ${req.usuario.nombre})`);
+
+    res.json({ ok: true, solicitud: actualizada, folio });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, errores: ['Error interno al aprobar la solicitud.'] });
   }
-
-  const { rows } = await pool.query(
-    `SELECT s.*, e.nombre, e.matricula, e.correo
-     FROM solicitudes s JOIN estudiantes e ON e.id = s.estudiante_id
-     WHERE s.id = $1`, [id]
-  );
-  const solicitud = rows[0];
-  if (!solicitud) return res.status(404).json({ ok: false, errores: ['Solicitud no encontrada.'] });
-
-  if (solicitud.tipo === 'reserva_espacio' && solicitud.espacio_id) {
-    await bloquearFecha(solicitud.espacio_id, solicitud.id, solicitud.fecha_evento, solicitud.hora_inicio, solicitud.hora_fin);
-  }
-
-  const { folio, ruta, codigoVerificacion } = await generarOficioPDF(solicitud, solicitud);
-  await pool.query(
-    `UPDATE solicitudes SET folio = $2, oficio_pdf_ruta = $3, codigo_verificacion = $4 WHERE id = $1`,
-    [id, folio, ruta, codigoVerificacion]
-  );
-
-  const actualizada = await actualizarEstado(id, 'aprobado', { folio, rutaPDF: ruta });
-  await registrarAccion(id, 'solicitud_aprobada', `Folio: ${folio} (por ${req.usuario.nombre})`);
-
-  res.json({ ok: true, solicitud: actualizada, folio });
 });
 
-// ------------------------------------------------------------
-// PUT /api/solicitudes/:id/rechazar   (solo RESPONSABLE)
-// ------------------------------------------------------------
 router.put('/:id/rechazar', requireRole('responsable'), async (req, res) => {
-  const { id } = req.params;
-  const { motivo } = req.body;
+  try {
+    const { id } = req.params;
+    const { motivo } = req.body;
 
-  const { rows } = await pool.query(
-    `SELECT s.*, e.nombre, e.correo FROM solicitudes s
-     JOIN estudiantes e ON e.id = s.estudiante_id WHERE s.id = $1`, [id]
-  );
-  const solicitud = rows[0];
-  if (!solicitud) return res.status(404).json({ ok: false, errores: ['Solicitud no encontrada.'] });
+    const { rows } = await pool.query(
+      `SELECT s.*, e.nombre, e.correo FROM solicitudes s
+       JOIN estudiantes e ON e.id = s.estudiante_id WHERE s.id = $1`, [id]
+    );
+    const solicitud = rows[0];
+    if (!solicitud) return res.status(404).json({ ok: false, errores: ['Solicitud no encontrada.'] });
 
-  const actualizada = await actualizarEstado(id, 'rechazado', { motivo });
-  await registrarAccion(id, 'solicitud_rechazada', `${motivo || 'Sin motivo especificado'} (por ${req.usuario.nombre})`);
+    const actualizada = await actualizarEstado(id, 'rechazado', { motivo });
+    await registrarAccion(id, 'solicitud_rechazada', `${motivo || 'Sin motivo especificado'} (por ${req.usuario.nombre})`);
 
-  res.json({ ok: true, solicitud: actualizada });
+    res.json({ ok: true, solicitud: actualizada });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, errores: ['Error interno al rechazar la solicitud.'] });
+  }
 });
 
-// ------------------------------------------------------------
-// GET /api/solicitudes/:id/oficio
-// ------------------------------------------------------------
 router.get('/:id/oficio', async (req, res) => {
   const { rows } = await pool.query(
     'SELECT oficio_pdf_ruta, folio, estudiante_id FROM solicitudes WHERE id = $1', [req.params.id]

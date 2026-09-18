@@ -20,5 +20,16 @@ app.use('/api/espacios', espaciosRouter);
 
 app.get('/api/salud', (req, res) => res.json({ ok: true, mensaje: 'API funcionando' }));
 
+// Red de seguridad: si algo truena sin ser atrapado, se registra pero
+// el servidor sigue vivo, en vez de morir por completo.
+app.use((err, req, res, next) => {
+  console.error('Error no manejado:', err);
+  res.status(500).json({ ok: false, errores: ['Error interno del servidor.'] });
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('Promesa no manejada:', err);
+});
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`Servidor escuchando en http://localhost:${PORT}`));
