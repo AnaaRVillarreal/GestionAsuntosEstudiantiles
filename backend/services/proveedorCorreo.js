@@ -1,13 +1,3 @@
-// ============================================================
-// Proveedor de correo (capa intercambiable)
-// IF EMAIL_PROVIDER=resend -> usa la API HTTP de Resend
-// IF EMAIL_PROVIDER=smtp   -> usa SMTP tradicional (nodemailer)
-// ELSE (sin configurar)    -> solo imprime en consola (modo desarrollo)
-//
-// Esto permite cambiar de proveedor sin tocar el resto del código:
-// solo se modifica esta capa (o se agrega otra función enviarPorX).
-// ============================================================
-
 const nodemailer = require('nodemailer');
 
 let transportadorSMTP = null;
@@ -24,24 +14,30 @@ function obtenerTransportadorSMTP() {
   return transportadorSMTP;
 }
 
-async function enviarPorSMTP({ to, subject, text }) {
+async function enviarPorSMTP({ to, subject, text, adjunto }) {
   await obtenerTransportadorSMTP().sendMail({
     from: process.env.EMAIL_FROM,
-    to, subject, text
+    to, subject, text,
+    attachments: adjunto ? [{ filename: adjunto.filename, path: adjunto.path }] : undefined
   });
 }
 
-// API de mensajería transaccional (ejemplo con Resend, https://resend.com/docs/api-reference/emails/send-email)
-// Cambia esta función por la de tu proveedor (SendGrid, Mailgun, SES, etc.)
-// si el formato del endpoint es distinto.
-async function enviarPorResend({ to, subject, text }) {
+async function enviarPorResend({ to, subject, text, adjunto }) {
+  const fs = require('fs');
+  const body = { from: process.env.EMAIL_FROM, to, subject, text };
+
+  if (adjunto) {
+    const contenidoBase64 = fs.readFileSync(adjunto.path).toString('base64');
+    body.attachments = [{ filename: adjunto.filename, content: contenidoBase64 }];
+  }
+
   const resp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ from: process.env.EMAIL_FROM, to, subject, text })
+    body: JSON.stringify(body)
   });
 
   if (!resp.ok) {
@@ -50,14 +46,13 @@ async function enviarPorResend({ to, subject, text }) {
   }
 }
 
-async function enviarCorreo({ to, subject, text }) {
+async function enviarCorreo({ to, subject, text, adjunto }) {
   const proveedor = (process.env.EMAIL_PROVIDER || '').toLowerCase();
 
-  if (proveedor === 'resend') return enviarPorResend({ to, subject, text });
-  if (proveedor === 'smtp') return enviarPorSMTP({ to, subject, text });
+  if (proveedor === 'resend') return enviarPorResend({ to, subject, text, adjunto });
+  if (proveedor === 'smtp') return enviarPorSMTP({ to, subject, text, adjunto });
 
-  // Modo desarrollo: sin proveedor configurado, solo se imprime en consola
-  console.log(`[correo simulado] Para: ${to} | Asunto: ${subject}\n${text}`);
+  console.log(`[correo simulado] Para: ${to} | Asunto: ${subject}${adjunto ? ' | Adjunto: ' + adjunto.filename : ''}\n${text}`);
 }
 
 module.exports = { enviarCorreo };

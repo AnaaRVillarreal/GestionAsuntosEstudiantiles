@@ -95,8 +95,10 @@ router.post('/', requireRole('estudiante'), async (req, res) => {
 router.get('/', async (req, res) => {
   const { estado } = req.query;
   const params = [];
-  let sql = `SELECT s.*, e.nombre, e.matricula, e.correo
-             FROM solicitudes s JOIN estudiantes e ON e.id = s.estudiante_id`;
+    let sql = `SELECT s.*, e.nombre, e.matricula, e.correo, esp.nombre AS espacio_nombre
+             FROM solicitudes s
+             JOIN estudiantes e ON e.id = s.estudiante_id
+             LEFT JOIN espacios esp ON esp.id = s.espacio_id`;
   const condiciones = [];
 
   if (req.usuario.rol === 'estudiante') {
@@ -148,7 +150,7 @@ router.put('/:id/aprobar', requireRole('responsable'), async (req, res) => {
     [id, folio, ruta, codigoVerificacion]
   );
 
-  const actualizada = await actualizarEstado(id, 'aprobado', { folio });
+  const actualizada = await actualizarEstado(id, 'aprobado', { folio, rutaPDF: ruta });
   await registrarAccion(id, 'solicitud_aprobada', `Folio: ${folio} (por ${req.usuario.nombre})`);
 
   res.json({ ok: true, solicitud: actualizada, folio });

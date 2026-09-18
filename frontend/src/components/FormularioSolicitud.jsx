@@ -21,6 +21,13 @@ export default function FormularioSolicitud() {
   const [enviando, setEnviando] = useState(false);
   const [exito, setExito] = useState(null);
   const [disponibilidad, setDisponibilidad] = useState(null);
+  const [espacios, setEspacios] = useState([]);
+
+  useEffect(() => {
+    apiFetch('/api/espacios').then(({ data }) => {
+      if (data.ok) setEspacios(data.espacios);
+    });
+  }, []);
 
   const cambiar = (campo) => (e) => setDatos({ ...datos, [campo]: e.target.value });
   const cambiarDetalle = (campo) => (e) =>
@@ -93,9 +100,16 @@ export default function FormularioSolicitud() {
               <label>Hora fin</label>
               <input type="time" value={datos.hora_fin} onChange={cambiar('hora_fin')} />
             </div>
-            <div className="campo">
-              <label>ID del espacio/auditorio</label>
-              <input type="number" value={datos.espacio_id} onChange={cambiar('espacio_id')} />
+             <div className="campo">
+              <label>Espacio / auditorio</label>
+              <select value={datos.espacio_id} onChange={cambiar('espacio_id')}>
+                <option value="">Selecciona un espacio</option>
+                {espacios.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre}{e.capacidad ? ` (capacidad: ${e.capacidad})` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
             {disponibilidad === true && <p style={{ color: '#27500A', fontSize: 13 }}>✅ Este horario está disponible.</p>}
             {disponibilidad === false && <p className="error">⚠️ Este horario ya está ocupado para ese espacio.</p>}
