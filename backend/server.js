@@ -7,6 +7,8 @@ const solicitudesRouter = require('./routes/solicitudes');
 const calendarioRouter = require('./routes/calendario');
 const verificacionRouter = require('./routes/verificacion');
 const espaciosRouter = require('./routes/espacios');
+const notificacionesRouter = require('./routes/notificaciones');
+const usuariosRouter = require('./routes/usuarios');
 
 const app = express();
 app.use(cors());
@@ -17,6 +19,8 @@ app.use('/api/solicitudes', solicitudesRouter);
 app.use('/api/calendario', calendarioRouter);
 app.use('/api/verificar', verificacionRouter);
 app.use('/api/espacios', espaciosRouter);
+app.use('/api/notificaciones', notificacionesRouter);
+app.use('/api/usuarios', usuariosRouter);
 
 app.get('/api/salud', (req, res) => res.json({ ok: true, mensaje: 'API funcionando' }));
 

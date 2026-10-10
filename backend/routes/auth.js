@@ -18,12 +18,8 @@ function firmarToken(usuario) {
   );
 }
 
-// ------------------------------------------------------------
-// POST /api/auth/registro-estudiante
 // Único registro abierto: el estudiante crea su propia cuenta.
-// Las cuentas de "responsable" se crean con el script de administración
-// (backend/scripts/crearResponsable.js), no por esta ruta.
-// ------------------------------------------------------------
+// Administrador, Logística, Jefatura y Dirección NO se crean por aquí.
 router.post('/registro-estudiante', async (req, res) => {
   const datos = req.body;
   const { valido, errores } = validarRegistroEstudiante(datos);
@@ -65,21 +61,28 @@ router.post('/registro-estudiante', async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------
-// POST /api/auth/login  (sirve para ambos roles)
-// ------------------------------------------------------------
+// Login para todos los roles
 router.post('/login', async (req, res) => {
-  const { correo, password } = req.body;
-  const { rows } = await pool.query('SELECT * FROM usuarios WHERE correo = $1', [correo]);
-  const usuario = rows[0];
+  try {
+    const { correo, password } = req.body;
+    const { rows } = await pool.query('SELECT * FROM usuarios WHERE correo = $1', [correo]);
+    const usuario = rows[0];
 
-  // IF el usuario no existe o la contraseña no coincide -> 401 / ELSE emite token
-  if (!usuario || !(await bcrypt.compare(password || '', usuario.password_hash))) {
-    return res.status(401).json({ ok: false, errores: ['Correo o contraseña incorrectos.'] });
+    if (!usuario || !(await bcrypt.compare(password || '', usuario.password_hash))) {
+      return res.status(401).json({ ok: false, errores: ['Correo o contraseña incorrectos.'] });
+    }
+
+    // IF el administrador desactivó la cuenta -> no entra / ELSE emite token
+    if (!usuario.activo) {
+      return res.status(403).json({ ok: false, errores: ['Tu cuenta está desactivada. Contacta al administrador.'] });
+    }
+
+    const token = firmarToken(usuario);
+    res.json({ ok: true, token, usuario: { nombre: usuario.nombre, rol: usuario.rol } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, errores: ['Error interno al iniciar sesión.'] });
   }
-
-  const token = firmarToken(usuario);
-  res.json({ ok: true, token, usuario: { nombre: usuario.nombre, rol: usuario.rol } });
 });
 
 module.exports = router;

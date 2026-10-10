@@ -1,7 +1,7 @@
 // ============================================================
 // ACTUADOR: Generador de PDF
-// Produce el oficio en PDF, con un código de verificación (hash)
-// y un QR que permiten comprobar la autenticidad del documento.
+// Produce el oficio con las firmas digitales de cada nivel de
+// aprobación, un código de verificación (hash) y un QR.
 // ============================================================
 
 const fs = require('fs');
@@ -9,6 +9,7 @@ const path = require('path');
 const crypto = require('crypto');
 const PDFDocument = require('pdfkit');
 const QRCode = require('qrcode');
+const { ETIQUETAS } = require('./flujoAprobacion');
 
 const CARPETA_OFICIOS = path.join(__dirname, '..', 'oficios');
 if (!fs.existsSync(CARPETA_OFICIOS)) fs.mkdirSync(CARPETA_OFICIOS);
@@ -18,8 +19,6 @@ function generarFolio(solicitud_id) {
   return `OF-${anio}-${String(solicitud_id).padStart(5, '0')}`;
 }
 
-// SENSOR/ACTUADOR: genera un código único a partir del folio, el id
-// y una clave secreta del servidor — nadie puede fabricarlo sin conocer JWT_SECRET.
 function generarCodigoVerificacion(solicitud_id, folio) {
   return crypto
     .createHash('sha256')
@@ -29,13 +28,35 @@ function generarCodigoVerificacion(solicitud_id, folio) {
     .toUpperCase();
 }
 
-function generarOficioPDF(solicitud, estudiante) {
+// Convierte una fecha (texto 'AAAA-MM-DD' o Date) a DD/MM/AAAA sin desfases de zona horaria
+function fechaLegible(f) {
+  if (!f) return '';
+  if (typeof f === 'string') {
+    const [a, m, d] = f.slice(0, 10).split('-');
+    return `${d}/${m}/${a}`;
+  }
+  const d = new Date(f);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
+function fechaHoraLegible(f) {
+  const d = new Date(f);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${fechaLegible(d)} ${hh}:${mm}`;
+}
+
+/**
+ * @param solicitud  fila de la solicitud
+ * @param estudiante datos del estudiante (nombre, matricula, correo)
+ * @param firmas     [{ rol, nombre, firma, creado_en }] en orden de aprobación
+ */
+function generarOficioPDF(solicitud, estudiante, firmas = []) {
   return new Promise(async (resolve, reject) => {
     try {
       const folio = generarFolio(solicitud.id);
       const codigoVerificacion = generarCodigoVerificacion(solicitud.id, folio);
-      const nombreArchivo = `${folio}.pdf`;
-      const ruta = path.join(CARPETA_OFICIOS, nombreArchivo);
+      const ruta = path.join(CARPETA_OFICIOS, `${folio}.pdf`);
 
       const qrDataUrl = await QRCode.toDataURL(
         `Folio:${folio} Código:${codigoVerificacion}`,
@@ -60,7 +81,7 @@ function generarOficioPDF(solicitud, estudiante) {
       doc.text(`Tipo de trámite: ${solicitud.tipo}`);
       doc.text(`Descripción: ${solicitud.descripcion}`);
       if (solicitud.fecha_evento) {
-        doc.text(`Fecha: ${solicitud.fecha_evento}  Hora: ${solicitud.hora_inicio} - ${solicitud.hora_fin}`);
+        doc.text(`Fecha: ${fechaLegible(solicitud.fecha_evento)}   Hora: ${solicitud.hora_inicio} - ${solicitud.hora_fin}`);
       }
 
       if (solicitud.detalles && Object.keys(solicitud.detalles).length > 0) {
@@ -71,11 +92,29 @@ function generarOficioPDF(solicitud, estudiante) {
         });
       }
 
-      doc.moveDown(2);
-      doc.fontSize(10).text('Firma digital del sistema — este código certifica la autenticidad del documento:', { width: 340 });
-      doc.fontSize(13).text(codigoVerificacion, { characterSpacing: 1 });
+      // ---- Firmas digitales de cada nivel de aprobación ----
+      doc.moveDown(1.5);
+      doc.fontSize(12).fillColor('#000000').text('Firmas digitales de autorización', { underline: true });
+      doc.moveDown(0.5);
+      firmas.forEach((f) => {
+        doc.fontSize(11).fillColor('#000000').text(`${ETIQUETAS[f.rol] || f.rol}: ${f.nombre}`);
+        doc.fontSize(9).fillColor('#555555').text(`Firmado el ${fechaHoraLegible(f.creado_en)}  ·  Firma: ${f.firma}`);
+        doc.moveDown(0.6);
+      });
+      doc.fillColor('#000000');
 
-      doc.image(qrBuffer, doc.page.width - 190, doc.y - 60, { width: 120 });
+      // ---- Código de verificación del documento + QR ----
+      if (doc.y > doc.page.height - 200) doc.addPage();
+      doc.moveDown(1);
+      const yBloque = doc.y;
+      doc.fontSize(10).text('Código de verificación del documento:', 50, yBloque, { width: 330 });
+      doc.fontSize(13).text(codigoVerificacion, 50, doc.y, { width: 330, characterSpacing: 1 });
+      doc.fontSize(9).fillColor('#555555').text(
+        'Escanea el QR para comprobar la autenticidad del oficio.',
+        50, doc.y + 4, { width: 330 }
+      );
+      doc.fillColor('#000000');
+      doc.image(qrBuffer, doc.page.width - 170, yBloque, { width: 110 });
 
       doc.end();
 
