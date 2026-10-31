@@ -1,6 +1,4 @@
 require('dotenv').config();
-const path = require('path');
-const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 
@@ -26,15 +24,8 @@ app.use('/api/usuarios', usuariosRouter);
 
 app.get('/api/salud', (req, res) => res.json({ ok: true, mensaje: 'API funcionando' }));
 
-// ---- Producción: el mismo servidor entrega el frontend ya compilado ----
-const carpetaFrontend = path.join(__dirname, '..', 'frontend', 'dist');
-if (fs.existsSync(carpetaFrontend)) {
-  app.use(express.static(carpetaFrontend));
-  // Cualquier ruta que no sea /api devuelve la aplicación de React
-  app.get(/^\/(?!api).*/, (req, res) => res.sendFile(path.join(carpetaFrontend, 'index.html')));
-}
-
-// Red de seguridad: si algo truena sin ser atrapado, el servidor sigue vivo
+// Red de seguridad: si algo truena sin ser atrapado, se registra pero
+// el servidor sigue vivo, en vez de morir por completo.
 app.use((err, req, res, next) => {
   console.error('Error no manejado:', err);
   res.status(500).json({ ok: false, errores: ['Error interno del servidor.'] });
