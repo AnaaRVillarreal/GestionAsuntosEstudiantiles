@@ -449,12 +449,15 @@ router.post('/:id/reenviar-oficio', requireRole('direccion', 'responsable'), asy
       });
     }
 
-    await enviarNotificacion(
+    const enviado = await enviarNotificacion(
       s.id, s.correo,
       'Reenvío de tu oficio',
       `Hola ${s.nombre}, te reenviamos el oficio de tu solicitud #${s.id} (Folio ${s.folio}).`,
       { filename: `${s.folio}.pdf`, path: s.oficio_pdf_ruta }
     );
+    if (!enviado) {
+      return res.status(502).json({ ok: false, errores: ['No se pudo enviar el correo. Revisa la configuración de correo del servidor.'] });
+    }
 
     // La confirmación vuelve a "pendiente" para que el estudiante responda de nuevo
     await pool.query(
