@@ -78,6 +78,8 @@ async function enviarPorBrevo({ to, subject, text, adjunto }) {
 }
 
 async function enviarCorreo({ to, subject, text, adjunto }) {
+  console.log('Proveedor de correo:', JSON.stringify(process.env.EMAIL_PROVIDER));
+  
   const proveedor = (process.env.EMAIL_PROVIDER || '').toLowerCase();
 
   if (proveedor === 'brevo') return enviarPorBrevo({ to, subject, text, adjunto });
